@@ -1,0 +1,9 @@
+{
+    "accounts": [
+        {
+            "token": "YOUR_DISCORD_TOKEN_HERE",
+            "channels": [],
+            "enabled": true
+        }
+    ]
+}
