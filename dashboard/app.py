@@ -162,6 +162,14 @@ def account_list():
             'avatar': str(bot.user.display_avatar.url) if bot.user.display_avatar else None,
             'paused': bot.paused
         })
+    # Fallback: if no NeuraBots running, show a local bot entry
+    if not accounts:
+        accounts.append({
+            'id': 'local',
+            'username': 'A2 Bot (Local)',
+            'avatar': None,
+            'paused': False
+        })
     return jsonify(accounts)
 
 def get_bot(account_id):
@@ -180,9 +188,16 @@ def stats():
     bot = get_bot(account_id)
     uid = str(account_id) if account_id else (str(bot.user.id) if bot and bot.user else None)
     
-    # if not uid and bot.user
-    if not uid:
-        return jsonify({})
+    # Fallback for standalone mode (no NeuraBot) - read from dashboard_stats.json
+    if not uid or uid == 'local':
+        ds_file = state.DASHBOARD_STATS_FILE
+        if os.path.exists(ds_file):
+            try:
+                with open(ds_file) as f:
+                    return jsonify(json.load(f))
+            except:
+                pass
+        return jsonify(state.get_empty_stats())
         
     st = state.account_stats.get(uid)
     if not st:
@@ -191,7 +206,7 @@ def stats():
              st['username'] = bot.username
              state.account_stats[uid] = st
         else:
-             return jsonify({})
+             return jsonify(state.get_empty_stats())
     
     uptime_start = st.get('uptime_start', time.time())
     elapsed = time.time() - uptime_start
@@ -312,7 +327,7 @@ def get_analytics():
 def settings():
     account_id = request.args.get('id')
     
-    if account_id:
+    if account_id and account_id != 'local':
         config_path = os.path.join(state.CONFIG_DIR, f'settings_{account_id}.json')
     else:
         config_path = os.path.join(state.CONFIG_DIR, 'settings.json')
@@ -400,7 +415,8 @@ def control():
     account_id = data.get('id')
     bot = get_bot(account_id)
     
-    if not bot: return jsonify({'success': False, 'error': 'Bot not found'})
+    if not bot:
+        return jsonify({'success': True, 'info': 'Standalone mode - use Discord commands (.af, .bj, etc.)'})
     
     if action == 'stop':
         bot.paused = True

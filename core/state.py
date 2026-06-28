@@ -36,6 +36,7 @@ stats = {
 checking_gems = {}
 missing_gems_cache = {}
 STATS_FILE = os.path.join(DATA_DIR, 'stats.json')
+DASHBOARD_STATS_FILE = os.path.join(DATA_DIR, 'dashboard_stats.json')
 
 account_stats = {}
 

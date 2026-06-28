@@ -1,5 +1,5 @@
 """
-A2 OWO FARMER
+A2 OWO FARMER - Ultimate OwO Bot
 Made by Ayush Rajdev & Anzar Iqbal
 """
 
@@ -19,9 +19,141 @@ BOT_DIR = os.path.dirname(os.path.abspath(__file__))
 bot = commands.Bot(command_prefix=PREFIX, help_command=None, case_insensitive=True, self_bot=True)
 
 OWO_BOT_ID = 408785106942164992
+SETTINGS_FILE = os.path.join(BOT_DIR, "config", "settings.json")
+DASHBOARD_FILE = os.path.join(BOT_DIR, "data", "dashboard_stats.json")
+
+def load_settings():
+    default = {
+        "farming": {
+            "autofarm": {"enabled": True, "cycle": ["owoh","owo sell all","owo flip 100","owo cash"], "delays": [15,2,8,13], "rest_interval": 300, "flip_amount": 100},
+            "hunt": {"enabled": True, "interval": 18},
+            "battle": {"enabled": True, "interval": 20},
+            "daily": {"enabled": True},
+            "cookie": {"enabled": False, "target_id": ""}
+        },
+        "blackjack": {
+            "bet_sequence": "Low", "stop_on_loss": 500000, "timer_minutes": 0,
+            "Low": [488, 976, 1952, 3904, 7808, 15616, 31232, 62464, 124928, 249856],
+            "High": [10000, 25000, 50000, 100000, 180000, 240000],
+            "Extreme": [50000, 100000, 200000, 400000, 800000, 1600000]
+        }
+    }
+    try:
+        if os.path.exists(SETTINGS_FILE):
+            with open(SETTINGS_FILE) as f:
+                return json.load(f)
+    except: pass
+    return default
+
+def save_settings(s):
+    os.makedirs(os.path.dirname(SETTINGS_FILE), exist_ok=True)
+    with open(SETTINGS_FILE, "w") as f:
+        json.dump(s, f, indent=4)
+
+cfg = load_settings()
 
 # ─── Auto Farm State ───
 auto_farm_active = False
+hunt_task = None
+battle_task = None
+daily_task = None
+
+# ─── Stats ───
+stats = {
+    "start_time": time.time(),
+    "current_cash": 0,
+    "hunt_count": 0, "session_hunt_count": 0,
+    "battle_count": 0, "session_battle_count": 0,
+    "owo_count": 0, "session_owo_count": 0,
+    "other_count": 0, "session_other_count": 0,
+    "total_cmd_count": 0,
+    "cowoncy_history": [],
+    "last_cash_update": 0,
+    "username": "A2 Bot",
+    "user_id": "local"
+}
+
+def format_seconds(s):
+    h = int(s // 3600); m = int((s % 3600) // 60); sec = int(s % 60)
+    return f"{h:02d}:{m:02d}:{sec:02d}"
+
+def write_dashboard_stats():
+    elapsed = time.time() - stats["start_time"]
+    mins = elapsed / 60
+    session_cmds = stats["session_hunt_count"] + stats["session_battle_count"] + stats["session_owo_count"] + stats["session_other_count"]
+    cpm = round(session_cmds / mins, 1) if mins > 0.1 else 0
+
+    cph = 0
+    hist = stats["cowoncy_history"]
+    if len(hist) > 1:
+        first = hist[0]; last = hist[-1]
+        time_diff = (last[0] - first[0]) / 3600
+        cash_diff = last[1] - first[1]
+        if time_diff > 0.01:
+            cph = round(cash_diff / time_diff)
+
+    data = {
+        "uptime": format_seconds(elapsed),
+        "cash": stats["current_cash"],
+        "logs": [],
+        "status": "ONLINE",
+        "security": {"captchas": 0, "bans": 0, "warnings": 0, "last_message": ""},
+        "analytics": {"cph": cph, "gems_used": 0},
+        "bot": {
+            "user_id": stats["user_id"],
+            "username": stats["username"],
+            "channel_id": None, "paused": False,
+            "throttled": False, "cooldown_remaining": 0, "cooldown_command": None
+        },
+        "chart_data": {
+            "hunt": stats["hunt_count"], "battle": stats["battle_count"],
+            "session_hunt": stats["session_hunt_count"], "session_battle": stats["session_battle_count"],
+            "session_owo": stats["session_owo_count"], "other": stats["other_count"],
+            "owo": stats["owo_count"], "total": stats["total_cmd_count"],
+            "perf_bpm": cpm
+        },
+        "system": {"last_cash_update": stats["last_cash_update"], "pending_commands": []},
+        "quest_data": [],
+        "next_quest_timer": None,
+        "cmd_states": {}
+    }
+    os.makedirs(os.path.dirname(DASHBOARD_FILE), exist_ok=True)
+    try:
+        with open(DASHBOARD_FILE, "w") as f:
+            json.dump(data, f)
+    except: pass
+
+async def stats_writer():
+    await bot.wait_until_ready()
+    while True:
+        try:
+            write_dashboard_stats()
+            await asyncio.sleep(10)
+        except: await asyncio.sleep(10)
+
+def track_command(cmd_type):
+    stats["total_cmd_count"] += 1
+    if cmd_type == "hunt":
+        stats["hunt_count"] += 1
+        stats["session_hunt_count"] += 1
+    elif cmd_type == "battle":
+        stats["battle_count"] += 1
+        stats["session_battle_count"] += 1
+    elif cmd_type == "owo":
+        stats["owo_count"] += 1
+        stats["session_owo_count"] += 1
+    else:
+        stats["other_count"] += 1
+        stats["session_other_count"] += 1
+
+def parse_cmd_type(text):
+    t = text.lower().strip()
+    if t.startswith("owo "):
+        p = t[4:].split()[0] if t[4:].split() else "owo"
+        if p in ("hunt","h"): return "hunt"
+        if p in ("battle","b"): return "battle"
+        if p == "owo": return "owo"
+    return "other"
 
 # ─── Blackjack State ───
 bj_active = False
@@ -36,8 +168,6 @@ def bj_load_data():
 def bj_save_data(d):
     with open(bj_data_file, "w") as f:
         json.dump(d, f, indent=2)
-
-BJ_SEQ = {"Low": [488, 976, 1952, 3904, 7808, 15616, 31232, 62464, 124928, 249856], "High": [10000, 25000, 50000, 100000, 180000, 240000]}
 
 def parse_time(s):
     t = 0
@@ -141,63 +271,194 @@ async def fetch_balance(ctx):
         except: pass
     return None
 
+async def safe_send(channel, text):
+    try:
+        await channel.send(text)
+        print(f"{Fore.GREEN}[SEND] {text}{Style.RESET_ALL}")
+        cmd_type = parse_cmd_type(text)
+        track_command(cmd_type)
+        if "cash" in text.lower().split():
+            await asyncio.sleep(3)
+            try:
+                for m in await channel.history(limit=5).flatten():
+                    if m.author.id == OWO_BOT_ID:
+                        t = get_owo_text(m)
+                        b = parse_balance(t)
+                        if b:
+                            stats["current_cash"] = b
+                            stats["last_cash_update"] = time.time()
+                            stats["cowoncy_history"].append((time.time(), b))
+                            if len(stats["cowoncy_history"]) > 100:
+                                stats["cowoncy_history"].pop(0)
+                        break
+            except: pass
+        return True
+    except Exception as e:
+        print(f"{Fore.RED}[SEND ERROR] {e}{Style.RESET_ALL}")
+        return False
+
 # ═══════════════════════════════════════
-#  AUTO FARM COMMANDS
+#  AUTO FARM SCHEDULER
+# ═══════════════════════════════════════
+
+async def auto_hunt_loop(ctx):
+    global hunt_task
+    await bot.wait_until_ready()
+    while True:
+        try:
+            fc = cfg.get("farming", {})
+            if fc.get("hunt", {}).get("enabled", True):
+                await safe_send(ctx.channel, "owo hunt")
+            await asyncio.sleep(fc.get("hunt", {}).get("interval", 18))
+        except asyncio.CancelledError: break
+        except: await asyncio.sleep(10)
+
+async def auto_battle_loop(ctx):
+    global battle_task
+    await bot.wait_until_ready()
+    while True:
+        try:
+            fc = cfg.get("farming", {})
+            if fc.get("battle", {}).get("enabled", True):
+                await safe_send(ctx.channel, "owo battle")
+            await asyncio.sleep(fc.get("battle", {}).get("interval", 20))
+        except asyncio.CancelledError: break
+        except: await asyncio.sleep(10)
+
+async def auto_daily_loop(ctx):
+    await bot.wait_until_ready()
+    while True:
+        try:
+            fc = cfg.get("farming", {})
+            if fc.get("daily", {}).get("enabled", True):
+                await safe_send(ctx.channel, "owo daily")
+            await asyncio.sleep(86400)
+        except asyncio.CancelledError: break
+        except: await asyncio.sleep(60)
+
+# ═══════════════════════════════════════
+#  COMMANDS
 # ═══════════════════════════════════════
 
 @bot.command()
 async def help(ctx):
+    c = cfg.get("farming", {}).get("autofarm", {})
+    flip = c.get("flip_amount", 100)
+    seq = cfg.get("blackjack", {}).get("bet_sequence", "Low")
     await ctx.reply(
         "**A2 OWO FARMER**\n"
         f"Prefix: `{PREFIX}`\n\n"
-        "**Auto Farm:**\n"
-        f"`{PREFIX}autofarm` - Start auto hunt/sell/flip/cash loop\n"
-        f"`{PREFIX}stopfarm` - Stop the loop\n\n"
-        "**Blackjack Farm:**\n"
-        f"`{PREFIX}bj` - Start blackjack farming\n"
+        "**💰 Auto Farm:**\n"
+        f"`{PREFIX}af` - Start auto farm loop (flip {flip})\n"
+        f"`{PREFIX}sf` - Stop auto farm\n"
+        f"`{PREFIX}hunt` - Start auto hunt every 18s\n"
+        f"`{PREFIX}battle` - Start auto battle every 20s\n"
+        f"`{PREFIX}stophunt` - Stop hunt loop\n"
+        f"`{PREFIX}stopbattle` - Stop battle loop\n\n"
+        "**♠️ Blackjack:**\n"
+        f"`{PREFIX}bj` - Start blackjack (seq: {seq})\n"
         f"`{PREFIX}bjstop` - Stop blackjack\n"
-        f"`{PREFIX}bjtimer 30m` - Set auto-stop timer\n"
-        f"`{PREFIX}bjstoponloss 500k` - Stop at loss limit\n"
-        f"`{PREFIX}bjbets Low/High` - Change bet sequence\n"
-        f"`{PREFIX}bjstatus` - Show stats\n\n"
+        f"`{PREFIX}bjtimer 30m` - Auto-stop timer\n"
+        f"`{PREFIX}bjloss 500k` - Stop on loss limit\n"
+        f"`{PREFIX}bjseq Low/High/Extreme` - Bet sequence\n"
+        f"`{PREFIX}bjst` - Blackjack stats\n\n"
+        "**⚙️ Config:**\n"
+        f"`{PREFIX}flip <amount>` - Set flip amount\n"
+        f"`{PREFIX}reload` - Reload settings\n"
+        f"`{PREFIX}bal` - Check balance\n\n"
         "**Made by Ayush Rajdev & Anzar Iqbal**"
     )
 
-@bot.command()
+@bot.command(aliases=["af"])
 async def autofarm(ctx):
     global auto_farm_active
     if auto_farm_active:
-        return await ctx.reply("Auto farm already running! Use `.stopfarm` to stop.")
+        return await ctx.reply("Auto farm already running! Use `.sf` to stop.")
     await ctx.message.delete()
-    await ctx.send("**A2 OWO FARMER - Auto Farm Enabled**\n**Made by Ayush Rajdev & Anzar Iqbal**")
+    fc = cfg.get("farming", {}).get("autofarm", {})
+    flip = fc.get("flip_amount", 100)
+    rest = fc.get("rest_interval", 300)
+    await ctx.send(f"**A2 FARM STARTED** (flip {flip})")
     auto_farm_active = True
     while auto_farm_active:
-        await ctx.send("owoh")
-        print(f"{Fore.GREEN}owoh{Style.RESET_ALL}")
+        await safe_send(ctx.channel, "owoh")
         await asyncio.sleep(15)
         if not auto_farm_active: break
-        await ctx.send("owo sell all")
-        print(f"{Fore.GREEN}sell all{Style.RESET_ALL}")
+        await safe_send(ctx.channel, "owo sell all")
         await asyncio.sleep(2)
         if not auto_farm_active: break
-        await ctx.send("owo flip 100")
-        print(f"{Fore.GREEN}flip 100{Style.RESET_ALL}")
+        await safe_send(ctx.channel, f"owo flip {flip}")
         await asyncio.sleep(8)
         if not auto_farm_active: break
-        await ctx.send("owo cash")
-        print(f"{Fore.GREEN}cash{Style.RESET_ALL}")
+        await safe_send(ctx.channel, "owo cash")
         await asyncio.sleep(13)
         if not auto_farm_active: break
-        await asyncio.sleep(300)
+        await asyncio.sleep(rest)
 
-@bot.command()
+@bot.command(aliases=["sf"])
 async def stopfarm(ctx):
     global auto_farm_active
     auto_farm_active = False
     await ctx.reply("Auto farm stopped.")
 
+@bot.command()
+async def hunt(ctx):
+    global hunt_task
+    if hunt_task and not hunt_task.done():
+        return await ctx.reply("Hunt loop already running! Use `.stophunt` first.")
+    await ctx.send("**Auto hunt started** (every 18s)")
+    hunt_task = asyncio.create_task(auto_hunt_loop(ctx))
+
+@bot.command()
+async def stophunt(ctx):
+    global hunt_task
+    if hunt_task:
+        hunt_task.cancel(); hunt_task = None
+    await ctx.reply("Hunt stopped.")
+
+@bot.command()
+async def battle(ctx):
+    global battle_task
+    if battle_task and not battle_task.done():
+        return await ctx.reply("Battle loop already running!")
+    await ctx.send("**Auto battle started** (every 20s)")
+    battle_task = asyncio.create_task(auto_battle_loop(ctx))
+
+@bot.command()
+async def stopbattle(ctx):
+    global battle_task
+    if battle_task:
+        battle_task.cancel(); battle_task = None
+    await ctx.reply("Battle stopped.")
+
+@bot.command(aliases=["bal"])
+async def balance(ctx):
+    bal = await fetch_balance(ctx)
+    if bal:
+        stats["current_cash"] = bal
+        stats["last_cash_update"] = time.time()
+        await ctx.reply(f"Balance: **__{bal:,}__** cowoncy")
+    else: await ctx.reply("Couldn't fetch balance.")
+
+@bot.command()
+async def flip(ctx, amount=None):
+    global cfg
+    if not amount: return await ctx.reply("Usage: `.flip 500`")
+    try:
+        amt = int(amount)
+        cfg.setdefault("farming", {}).setdefault("autofarm", {})["flip_amount"] = amt
+        save_settings(cfg)
+        await ctx.reply(f"Flip amount set to **{amt}**")
+    except: await ctx.reply("Invalid amount.")
+
+@bot.command()
+async def reload(ctx):
+    global cfg
+    cfg = load_settings()
+    await ctx.reply("Settings reloaded from config/settings.json")
+
 # ═══════════════════════════════════════
-#  BLACKJACK COMMANDS
+#  BLACKJACK
 # ═══════════════════════════════════════
 
 @bot.command()
@@ -211,23 +472,29 @@ async def bj(ctx):
     d.update({"start_balance": bal, "curr_balance": bal, "wins": 0, "losses": 0, "ties": 0, "cmds": 0, "seq_idx": 0, "profit": 0})
     bj_save_data(d)
     bj_active = True
-    await ctx.send(f"A2 Blackjack Farm started. Balance: __{bal:,}__ cowoncy.")
+    seq = cfg.get("blackjack", {}).get("bet_sequence", "Low")
+    await ctx.send(f"A2 Blackjack started. Balance: __{bal:,}__ | Seq: {seq}")
     asyncio.create_task(_bj_loop(ctx))
 
 async def _bj_loop(ctx):
     global bj_active
     d = bj_load_data()
-    seq_name = "Low"
     while bj_active:
         try:
+            bc = cfg.get("blackjack", {})
+            seq_name = bc.get("bet_sequence", "Low")
+            sol_limit = bc.get("stop_on_loss", 500000)
+
             if d.get("timer_end") and time.time() >= d["timer_end"]:
                 if d["seq_idx"] == 0:
                     bj_active = False; d["timer_end"] = None; bj_save_data(d)
                     await ctx.send("Timer ended. Farm stopped after a win."); return
-            sol = d.get("sol_limit", 499224)
+
+            sol = d.get("sol_limit", sol_limit)
             if d.get("profit", 0) < 0 and abs(d["profit"]) >= sol:
-                bj_active = False; await ctx.send(f"Stop-on-Loss: __{abs(d['profit']):,}__ loss."); return
-            seq = BJ_SEQ.get(seq_name, BJ_SEQ["Low"])
+                bj_active = False; await ctx.send(f"Stop-on-Loss: __{abs(d['profit']):,}__"); return
+
+            seq = bc.get(seq_name, bc.get("Low", [488, 976, 1952, 3904, 7808, 15616, 31232, 62464, 124928, 249856]))
             if d["seq_idx"] >= len(seq): d["seq_idx"] = 0
             bet = seq[d["seq_idx"]]
             d["cmds"] += 1; bj_save_data(d)
@@ -248,7 +515,6 @@ async def _bj_loop(ctx):
                     if msg: break
                 except: pass
             if not msg: continue
-            last_react = None
             while bj_active:
                 try:
                     await asyncio.sleep(2)
@@ -300,8 +566,8 @@ async def bjtimer(ctx, *, t=None):
     await ctx.send(f"Timer set for {t}.")
 
 @bot.command()
-async def bjstoponloss(ctx, *, amt=None):
-    if not amt: return await ctx.send("Usage: `.bjstoponloss 500k`")
+async def bjloss(ctx, *, amt=None):
+    if not amt: return await ctx.send("Usage: `.bjloss 500k`")
     try:
         lim = parse_amt(amt)
         if lim < 100000: return await ctx.send("Min 100k.")
@@ -310,14 +576,17 @@ async def bjstoponloss(ctx, *, amt=None):
     except: await ctx.send("Invalid format.")
 
 @bot.command()
-async def bjbets(ctx, name=None):
-    if not name: return await ctx.send("Usage: `.bjbets Low` or `.bjbets High`")
+async def bjseq(ctx, name=None):
+    global cfg
+    if not name: return await ctx.send("Usage: `.bjseq Low/High/Extreme`")
     n = name.capitalize()
-    if n not in BJ_SEQ: return await ctx.send("Use `Low` or `High`.")
-    open(os.path.join(BOT_DIR, "bj_config.json"),"w").write(json.dumps({"seq":n}))
-    await ctx.send(f"Sequence: {n}.")
+    valid = cfg.get("blackjack", {})
+    if n not in ["Low","High","Extreme"]: return await ctx.send("Use `Low`, `High`, or `Extreme`.")
+    cfg["blackjack"]["bet_sequence"] = n
+    save_settings(cfg)
+    await ctx.send(f"Bet sequence: **{n}**.")
 
-@bot.command()
+@bot.command(aliases=["bjst"])
 async def bjstatus(ctx):
     d = bj_load_data()
     bal = await fetch_balance(ctx)
@@ -327,13 +596,22 @@ async def bjstatus(ctx):
     total = d["wins"]+d["losses"]+d["ties"]
     wp = (d["wins"]/total*100) if total else 0
     await ctx.send(
-        f"**A2 BLACKJACK STATUS**\n"
+        f"**A2 BLACKJACK**\n"
         f"Balance: __{d['start_balance']:,}__ -> __{d['curr_balance']:,}__ ({ps})\n"
         f"Wins: {d['wins']} ({wp:.1f}%) | Losses: {d['losses']} | Ties: {d['ties']}\n"
         f"Commands: {d['cmds']}"
     )
 
 # ═══════════════════════════════════════
+
+@bot.event
+async def on_ready():
+    act = discord.Activity(type=discord.ActivityType.playing, name="A2 OWO FARMER")
+    await bot.change_presence(status=discord.Status.idle, activity=act)
+    stats["username"] = str(bot.user)
+    stats["user_id"] = str(bot.user.id)
+    print(f"{Fore.GREEN}Connected as: {bot.user}{Style.RESET_ALL}")
+    asyncio.create_task(stats_writer())
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
@@ -351,17 +629,16 @@ if __name__ == "__main__":
     ████      ████       ██████      ██   ██   ██ 
 {Style.RESET_ALL}""")
     print(f"{Fore.GREEN}A2 OWO FARMER - Made by Ayush Rajdev & Anzar Iqbal{Style.RESET_ALL}")
-    print(f"{Fore.YELLOW}Commands: {PREFIX}autofarm, {PREFIX}stopfarm, {PREFIX}bj, {PREFIX}bjstop, {PREFIX}help{Style.RESET_ALL}\n")
+    print(f"{Fore.YELLOW}Commands: {PREFIX}af, {PREFIX}hunt, {PREFIX}battle, {PREFIX}bj, {PREFIX}help{Style.RESET_ALL}\n")
 
     dash_script = os.path.join(BOT_DIR, "web.py")
     if os.path.exists(dash_script):
         subprocess.Popen([sys.executable, dash_script], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        print(f"{Fore.GREEN}Dashboard: http://100.75.203.74:6909{Style.RESET_ALL}")
 
-    @bot.event
-    async def on_ready():
-        act = discord.Activity(type=discord.ActivityType.playing, name="A2 OWO FARMER")
-        await bot.change_presence(status=discord.Status.idle, activity=act)
-        print(f"{Fore.GREEN}Connected as: {bot.user}{Style.RESET_ALL}")
+    flask_script = os.path.join(BOT_DIR, "run_flask.sh")
+    if os.path.exists(flask_script):
+        subprocess.Popen(["bash", flask_script], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    print(f"{Fore.GREEN}Dashboard: http://100.75.203.74:6909{Style.RESET_ALL}")
 
     bot.run(TOKEN)

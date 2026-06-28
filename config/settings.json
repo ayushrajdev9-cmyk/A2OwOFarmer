@@ -1,0 +1,42 @@
+{
+    "farming": {
+        "autofarm": {
+            "enabled": true,
+            "cycle": ["owoh", "owo sell all", "owo flip 100", "owo cash"],
+            "delays": [15, 2, 8, 13],
+            "rest_interval": 300,
+            "flip_amount": 100
+        },
+        "hunt": {
+            "enabled": true,
+            "interval": 18
+        },
+        "battle": {
+            "enabled": true,
+            "interval": 20
+        },
+        "daily": {
+            "enabled": true
+        },
+        "cookie": {
+            "enabled": false,
+            "target_id": ""
+        }
+    },
+    "blackjack": {
+        "bet_sequence": "Low",
+        "stop_on_loss": 500000,
+        "timer_minutes": 0,
+        "Low": [488, 976, 1952, 3904, 7808, 15616, 31232, 62464, 124928, 249856],
+        "High": [10000, 25000, 50000, 100000, 180000, 240000],
+        "Extreme": [50000, 100000, 200000, 400000, 800000, 1600000]
+    },
+    "security": {
+        "auto_stop_on_warning": true,
+        "max_warnings": 1
+    },
+    "stealth": {
+        "typing_delay_min": 1,
+        "typing_delay_max": 3
+    }
+}
