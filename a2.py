@@ -8,26 +8,13 @@ from discord.ext import commands
 from colorama import Fore, Style, init as colorama_init
 import asyncio, json, re, os, time, unicodedata, sys, random
 from datetime import datetime
-from threading import Thread
-from http.server import HTTPServer, BaseHTTPRequestHandler
-
-class WebHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-type', 'text/html')
-        self.end_headers()
-        self.wfile.write(b"<h1>A2 OWO FARMER</h1><p>Made by Ayush Rajdev &amp; Anzar Iqbal</p><p>Bot is running!</p>")
-    def log_message(self, format, *args):
-        pass
-
-def run_web():
-    srv = HTTPServer(('0.0.0.0', 6909), WebHandler)
-    srv.serve_forever()
+import subprocess
 
 colorama_init()
 
 TOKEN = ""
 PREFIX = "."
+BOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 bot = commands.Bot(command_prefix=PREFIX, help_command=None, case_insensitive=True, self_bot=True)
 
@@ -38,7 +25,7 @@ auto_farm_active = False
 
 # ─── Blackjack State ───
 bj_active = False
-bj_data_file = "bj_data.json"
+bj_data_file = os.path.join(BOT_DIR, "bj_data.json")
 
 def bj_load_data():
     if os.path.exists(bj_data_file):
@@ -318,7 +305,7 @@ async def bjbets(ctx, name=None):
     if not name: return await ctx.send("Usage: `.bjbets Low` or `.bjbets High`")
     n = name.capitalize()
     if n not in BJ_SEQ: return await ctx.send("Use `Low` or `High`.")
-    open("bj_config.json","w").write(json.dumps({"seq":n}))
+    open(os.path.join(BOT_DIR, "bj_config.json"),"w").write(json.dumps({"seq":n}))
     await ctx.send(f"Sequence: {n}.")
 
 @bot.command()
@@ -344,7 +331,7 @@ if __name__ == "__main__":
         TOKEN = sys.argv[1]
     else:
         TOKEN = input("Enter Discord token: ").strip()
-    
+
     print(f"""{Fore.CYAN}
     ██████   ██████       ██████  ██    ██ ██████ 
    ██  ██   ██  ██      ██    ██ ██    ██ ██    ██
@@ -356,14 +343,16 @@ if __name__ == "__main__":
 {Style.RESET_ALL}""")
     print(f"{Fore.GREEN}A2 OWO FARMER - Made by Ayush Rajdev & Anzar Iqbal{Style.RESET_ALL}")
     print(f"{Fore.YELLOW}Commands: {PREFIX}autofarm, {PREFIX}stopfarm, {PREFIX}bj, {PREFIX}bjstop, {PREFIX}help{Style.RESET_ALL}\n")
-    
+
+    dash_script = os.path.join(BOT_DIR, "dashboard.py")
+    if os.path.exists(dash_script):
+        subprocess.Popen([sys.executable, dash_script], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        print(f"{Fore.GREEN}Dashboard: http://100.75.203.74:6909{Style.RESET_ALL}")
+
     @bot.event
     async def on_ready():
         act = discord.Activity(type=discord.ActivityType.playing, name="A2 OWO FARMER")
         await bot.change_presence(status=discord.Status.idle, activity=act)
         print(f"{Fore.GREEN}Connected as: {bot.user}{Style.RESET_ALL}")
-    
-    Thread(target=run_web, daemon=True).start()
-    print(f"{Fore.GREEN}Dashboard: http://100.75.203.74:6909{Style.RESET_ALL}")
-    
+
     bot.run(TOKEN)
