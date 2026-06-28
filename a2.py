@@ -8,6 +8,16 @@ from discord.ext import commands
 from colorama import Fore, Style, init as colorama_init
 import asyncio, json, re, os, time, unicodedata, sys, random
 from datetime import datetime
+from threading import Thread
+from flask import Flask
+
+web = Flask('')
+@web.route('/')
+def home():
+    return "<h1>A2 OWO FARMER</h1><p>Made by Ayush Rajdev &amp; Anzar Iqbal</p><p>Bot is running!</p>"
+
+def run_web():
+    web.run(host='0.0.0.0', port=6909, debug=False, use_reloader=False)
 
 colorama_init()
 
@@ -347,5 +357,9 @@ if __name__ == "__main__":
         act = discord.Activity(type=discord.ActivityType.playing, name="A2 OWO FARMER")
         await bot.change_presence(status=discord.Status.idle, activity=act)
         print(f"{Fore.GREEN}Connected as: {bot.user}{Style.RESET_ALL}")
+    
+    t = Thread(target=run_web, daemon=True)
+    t.start()
+    print(f"{Fore.GREEN}Dashboard: http://100.75.203.74:6909{Style.RESET_ALL}")
     
     bot.run(TOKEN)
