@@ -14,7 +14,7 @@ colorama_init()
 TOKEN = ""
 PREFIX = "."
 
-bot = commands.Bot(command_prefix=PREFIX, help_command=None, case_insensitive=True, self_bot=True, intents=discord.Intents.all())
+bot = commands.Bot(command_prefix=PREFIX, help_command=None, case_insensitive=True, self_bot=True)
 
 OWO_BOT_ID = 408785106942164992
 
