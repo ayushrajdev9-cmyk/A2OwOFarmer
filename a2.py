@@ -172,14 +172,23 @@ async def autofarm(ctx):
     await ctx.send("**A2 OWO FARMER - Auto Farm Enabled**\n**Made by Ayush Rajdev & Anzar Iqbal**")
     auto_farm_active = True
     while auto_farm_active:
-        async with ctx.typing():
-            for cmd in [("owoh", 15), ("owo sell all", 2), ("owo flip 100", 8), ("owo cash", 13)]:
-                if not auto_farm_active: break
-                await ctx.send(cmd[0])
-                print(f"{Fore.GREEN}{cmd[0]}{Style.RESET_ALL}")
-                await asyncio.sleep(cmd[1])
-        if auto_farm_active:
-            await asyncio.sleep(300)
+        await ctx.send("owoh")
+        print(f"{Fore.GREEN}owoh{Style.RESET_ALL}")
+        await asyncio.sleep(15)
+        if not auto_farm_active: break
+        await ctx.send("owo sell all")
+        print(f"{Fore.GREEN}sell all{Style.RESET_ALL}")
+        await asyncio.sleep(2)
+        if not auto_farm_active: break
+        await ctx.send("owo flip 100")
+        print(f"{Fore.GREEN}flip 100{Style.RESET_ALL}")
+        await asyncio.sleep(8)
+        if not auto_farm_active: break
+        await ctx.send("owo cash")
+        print(f"{Fore.GREEN}cash{Style.RESET_ALL}")
+        await asyncio.sleep(13)
+        if not auto_farm_active: break
+        await asyncio.sleep(300)
 
 @bot.command()
 async def stopfarm(ctx):
@@ -344,7 +353,7 @@ if __name__ == "__main__":
     print(f"{Fore.GREEN}A2 OWO FARMER - Made by Ayush Rajdev & Anzar Iqbal{Style.RESET_ALL}")
     print(f"{Fore.YELLOW}Commands: {PREFIX}autofarm, {PREFIX}stopfarm, {PREFIX}bj, {PREFIX}bjstop, {PREFIX}help{Style.RESET_ALL}\n")
 
-    dash_script = os.path.join(BOT_DIR, "dashboard.py")
+    dash_script = os.path.join(BOT_DIR, "web.py")
     if os.path.exists(dash_script):
         subprocess.Popen([sys.executable, dash_script], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         print(f"{Fore.GREEN}Dashboard: http://100.75.203.74:6909{Style.RESET_ALL}")
